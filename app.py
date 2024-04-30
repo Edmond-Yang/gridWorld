@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify
 import numpy as np
 import random
+from tqdm import tqdm
 
 app = Flask(__name__)
 
@@ -189,7 +190,7 @@ class GridWorld:
         """自动重新初始化策略并继续寻找,直到找到从起点到终点的路径或达到尝试上限"""
         iteration = 0
         answer = []
-        while iteration < max_iterations:
+        for iteration in tqdm(range(max_iterations)):
             self.initialize_random_policy()
             self.value_iteration(gamma, epsilon)
             optimal_path = self.get_optimal_path()
@@ -277,4 +278,4 @@ def evaluate_policy():
 
 
 if __name__ == '__main__':
-    app.run(port=8000, debug=True)
+    app.run(port=7000, debug=True)
