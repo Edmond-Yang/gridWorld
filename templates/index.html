@@ -173,7 +173,9 @@
             .then(response => response.json())
             .then(data => {
                 alert(data['optimal_path']);
-                renderActionLog(data['action_log'])
+
+                if(data['optimal_path'] !== 'Optimal Path Not Found')
+                    renderActionLog(data['action_log'])
             })
             .catch(error => console.error('Error:', error));
         }
@@ -192,7 +194,7 @@
                     }
                     cell.classList.add('current');
                     i = (i+1) % actionLog.length;
-                    setTimeout(updateGrid, 100); // 更新下一個動作的延遲
+                    setTimeout(updateGrid, 200); // 更新下一個動作的延遲
                 }
             }
             updateGrid(); // 開始更新格子
@@ -201,6 +203,7 @@
         window.onload = function(){
             document.getElementById('text').innerHTML = 'Please click on the grid cells to set the starting point (green)';
             $('#evaluate-btn').on('click', function (){
+
                 evaluate();
             })
         }
