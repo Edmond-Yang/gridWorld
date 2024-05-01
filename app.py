@@ -5,6 +5,7 @@ from tqdm import tqdm
 
 app = Flask(__name__)
 
+
 class GridWorld:
     def __init__(self, n):
         self.n = n
@@ -65,16 +66,6 @@ class GridWorld:
 
         self.value_function[state] = reward
 
-        action_result = "valid" if is_valid else "invalid"
-        self.action_log.append({
-            "state": list(state),
-            "action": action,
-            "next_state": list(next_state),
-            "result": action_result,
-            "reward": reward
-        })
-
-
     def value_iteration(self, gamma=0.9, epsilon=1e-6, max_iterations=10000):
         """Perform value iteration to converge the value function."""
         self.initialize_random_policy()
@@ -100,47 +91,6 @@ class GridWorld:
         # print("\nOptimal Policy:")
         # for state, action in optimal_policy.items():
         #     print(f"State {state}: Action = {action}")
-
-    def get_optimal_policy(self):
-        """Derive the optimal policy from the converged value function."""
-        optimal_policy = {}
-        for state in self.policy:
-            if state != self.end:
-                max_value = -float('inf')
-                best_action = None
-                possible_actions = self.get_possible_actions(state)
-                for action in possible_actions:
-                    next_states = []
-                    transition_probs = []
-                    if action == 'up':
-                        next_state = (state[0] - 1, state[1])
-                        if self.is_reachable(next_state):
-                            next_states.append(next_state)
-                            transition_probs.append(1.0)
-                    elif action == 'down':
-                        next_state = (state[0] + 1, state[1])
-                        if self.is_reachable(next_state):
-                            next_states.append(next_state)
-                            transition_probs.append(1.0)
-                    elif action == 'left':
-                        next_state = (state[0], state[1] - 1)
-                        if self.is_reachable(next_state):
-                            next_states.append(next_state)
-                            transition_probs.append(1.0)
-                    elif action == 'right':
-                        next_state = (state[0], state[1] + 1)
-                        if self.is_reachable(next_state):
-                            next_states.append(next_state)
-                            transition_probs.append(1.0)
-
-                    value = sum(transition_probs[i] * self.value_function.get(next_state, 0) for i, next_state in
-                                enumerate(next_states))
-                    if value > max_value:
-                        max_value = value
-                        best_action = action
-                if best_action is not None:
-                    optimal_policy[state] = best_action
-        return optimal_policy
 
     def get_optimal_path(self):
         """根据最优策略从起点出发找到到达终点的路径，包含防止无限循环的措施。"""
@@ -171,6 +121,12 @@ class GridWorld:
                 # print("No valid action found, stopping path search.")
                 return []  # 如果没有有效行动，返回空列表
 
+            self.action_log.append({
+                "state": list(curr_state),
+                "action": action,
+                "reward": self.value_function[curr_state]
+            })
+
             # 檢查是否出界或走進障礙物
             if not self.is_reachable(next_state):
                 # print("Next state is not reachable, stopping path search.")
@@ -180,6 +136,11 @@ class GridWorld:
             steps += 1
 
         if curr_state == self.end:
+            self.action_log.append({
+                "state": list(curr_state),
+                "action": '',
+                "reward": 0
+            })
             path.append(self.end)
             return path
         else:
@@ -198,6 +159,7 @@ class GridWorld:
 
                 if not answer or len(answer) > len(optimal_path):
                     # print("Optimal Path Found:", optimal_path)
+                    self.action_log = []
                     answer = optimal_path
             else:
                 # print(f"No valid path found in iteration {iteration + 1}")
@@ -207,20 +169,6 @@ class GridWorld:
         if not answer:
             print("Failed to find a path after maximum iterations")
         return answer  # 如果达到最大迭代次数仍未找到路径,返回空列表
-
-    def get_possible_actions(self, state):
-        """Get the possible actions from a given state."""
-        actions = []
-        row, col = state
-        if row > 0 and (row - 1, col) not in self.obstacles:
-            actions.append('up')
-        if row < self.n - 1 and (row + 1, col) not in self.obstacles:
-            actions.append('down')
-        if col > 0 and (row, col - 1) not in self.obstacles:
-            actions.append('left')
-        if col < self.n - 1 and (row, col + 1) not in self.obstacles:
-            actions.append('right')
-        return actions
 
     def get_action_log(self):
         """Retrieve the action log."""
@@ -259,6 +207,7 @@ def evaluate_policy():
 
     grid_world.value_iteration()
     optimal_path = grid_world.find_optimal_path()
+    action_log = grid_world.get_action_log()
 
     new_optimal_path = ''
     for point in optimal_path:
@@ -272,10 +221,14 @@ def evaluate_policy():
     print('ANS:')
     print(new_optimal_path)
 
+    print('LEN:')
+    print(len(action_log))
+
     return jsonify({
         'optimal_path': new_optimal_path,
+        'action_log': action_log[-100:]
     })
 
 
 if __name__ == '__main__':
-    app.run(port=7000, debug=True)
+    app.run(port=9000, debug=True)

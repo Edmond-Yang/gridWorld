@@ -30,6 +30,10 @@
             background-color: gray;
         }
 
+        .current {
+            background-color: orange; /* 標記當前位置的顏色 */
+        }
+
         #grid-with-arrows {
             display: grid;
             grid-template-columns: repeat({{ n }}, 50px); /* 根据网格大小调整 */
@@ -169,11 +173,33 @@
             .then(response => response.json())
             .then(data => {
                 alert(data['optimal_path']);
-                // renderResults(data.value_function, data.optimal_policy);
+                renderActionLog(data['action_log'])
             })
             .catch(error => console.error('Error:', error));
         }
 
+        function renderActionLog(actionLog) {
+            let i = 0;
+            function updateGrid() {
+                if (i < actionLog.length) {
+                    const action = actionLog[i];
+                    const cellId = `cell-${action.state[0]}-${action.state[1]}`;
+                    const cell = document.getElementById(cellId);
+                    const prevSelected = document.querySelector('.current');
+                    if (prevSelected) {
+                        prevSelected.classList.remove('current');
+                        prevSelected.innerHTML = '';  // 清空前一個格子的內容
+                    }
+                    cell.classList.add('current');
+                    // cell.style.backgroundColor = 'orange';
+                    // cell.innerHTML = `<div class="arrow ${action.action}"></div>`;
+                    i++;
+                    document.getElementById('value-function').innerHTML = 'Current Cell Value Function: ' + action.reward
+                    setTimeout(updateGrid, 100); // 更新下一個動作的延遲
+                }
+            }
+            updateGrid(); // 開始更新格子
+        }
 
         window.onload = function(){
             document.getElementById('text').innerHTML = 'Please click on the grid cells to set the starting point (green)';
@@ -184,6 +210,7 @@
 
     </script>
     <p id="text"></p>
+    <p id="value-function"></p>
     <div class="grid-container" id="grid-container">
         {% for row in range(n) %}
             {% for col in range(n) %}
