@@ -220,20 +220,6 @@ def evaluate_policy():
     print('ANS:')
     print(new_optimal_path)
 
-    print('V(s)')
-    val = grid_world.value_function
-    for i in range(grid_size):
-        for j in range(grid_size):
-
-            if j == grid_size-1:
-                print('{:.2f}'.format(val[(i,j)]))
-                print('-'*30)
-            else:
-                if (i, j) in val:
-                    print('{:.2f}'.format(val[(i,j)]), end=" |")
-                else:
-                    print('{:.2f}'.format(0), end=" |")
-
     return jsonify({
         'optimal_path': new_optimal_path,
         'action_log': action_log
