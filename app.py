@@ -121,12 +121,6 @@ class GridWorld:
                 # print("No valid action found, stopping path search.")
                 return []  # 如果没有有效行动，返回空列表
 
-            self.action_log.append({
-                "state": list(curr_state),
-                "action": action,
-                "reward": self.value_function[curr_state]
-            })
-
             # 檢查是否出界或走進障礙物
             if not self.is_reachable(next_state):
                 # print("Next state is not reachable, stopping path search.")
@@ -147,7 +141,7 @@ class GridWorld:
             # print("Failed to reach end within step limit.")
             return []  # 如果在步数限制内未到达终点，返回空列表
 
-    def find_optimal_path(self, max_iterations=10000, gamma=0.9, epsilon=1e-6):
+    def find_optimal_path(self, max_iterations=100000, gamma=0.9, epsilon=1e-6):
         """自动重新初始化策略并继续寻找,直到找到从起点到终点的路径或达到尝试上限"""
         iteration = 0
         answer = []
@@ -159,7 +153,6 @@ class GridWorld:
 
                 if not answer or len(answer) > len(optimal_path):
                     # print("Optimal Path Found:", optimal_path)
-                    self.action_log = []
                     answer = optimal_path
             else:
                 # print(f"No valid path found in iteration {iteration + 1}")
@@ -168,6 +161,7 @@ class GridWorld:
 
         if not answer:
             print("Failed to find a path after maximum iterations")
+
         return answer  # 如果达到最大迭代次数仍未找到路径,返回空列表
 
     def get_action_log(self):
@@ -207,9 +201,9 @@ def evaluate_policy():
 
     grid_world.value_iteration()
     optimal_path = grid_world.find_optimal_path()
-    action_log = grid_world.get_action_log()
 
     new_optimal_path = ''
+    action_log = []
     for point in optimal_path:
         new_optimal_path += '[' + str(point[0]) + ', ' + str(point[1]) + '] → '
 
@@ -217,16 +211,18 @@ def evaluate_policy():
 
     if not new_optimal_path:
         new_optimal_path = 'Optimal Path Not Found'
+    else:
+        for points in optimal_path:
+            action_log.append(
+                {'state': points}
+            )
 
     print('ANS:')
     print(new_optimal_path)
 
-    print('LEN:')
-    print(len(action_log))
-
     return jsonify({
         'optimal_path': new_optimal_path,
-        'action_log': action_log[-100:]
+        'action_log': action_log
     })
 
 

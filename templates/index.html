@@ -191,10 +191,7 @@
                         prevSelected.innerHTML = '';  // 清空前一個格子的內容
                     }
                     cell.classList.add('current');
-                    // cell.style.backgroundColor = 'orange';
-                    // cell.innerHTML = `<div class="arrow ${action.action}"></div>`;
-                    i++;
-                    document.getElementById('value-function').innerHTML = 'Current Cell Value Function: ' + action.reward
+                    i = (i+1) % actionLog.length;
                     setTimeout(updateGrid, 100); // 更新下一個動作的延遲
                 }
             }
@@ -210,7 +207,6 @@
 
     </script>
     <p id="text"></p>
-    <p id="value-function"></p>
     <div class="grid-container" id="grid-container">
         {% for row in range(n) %}
             {% for col in range(n) %}
