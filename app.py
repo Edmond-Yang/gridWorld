@@ -5,18 +5,19 @@ from tqdm import tqdm
 
 app = Flask(__name__)
 
+N = 20
 
 class GridWorld:
     def __init__(self, n):
-        self.n = n
+        self.n = n  # grid size
         self.grid = np.zeros((n, n))
         self.start = None
         self.end = None
         self.obstacles = []
-        self.policy = {}
-        self.value_function = {}
-        # New attribute for action logging
-        self.action_log = []
+        self.q_table = {}
+        self.learning_rate = 0.1
+        self.discount_factor = 0.9
+        self.epsilon = 0.2  # Exploration rate
 
     def set_start(self, row, col):
         self.start = (row, col)
@@ -27,146 +28,108 @@ class GridWorld:
     def set_obstacle(self, row, col):
         self.obstacles.append((row, col))
 
-    def initialize_random_policy(self):
-        """Initialize a random policy for all states."""
-        for i in range(self.n):
-            for j in range(self.n):
-                if (i, j) not in self.obstacles and (i, j) != self.end:
-                    self.policy[(i, j)] = random.choice(['up', 'down', 'left', 'right'])
-
     def is_reachable(self, state):
-        """Check if a state is valid (within bounds and not an obstacle)."""
         row, col = state
         return 0 <= row < self.n and 0 <= col < self.n and state not in self.obstacles
 
-    def bellman_update(self, state, action, gamma=0.9):
-        """Perform a Bellman update for a given state and action."""
+    def initialize_q_table(self):
+        """Initialize the Q-table for each state-action pair to zero."""
+        for i in range(self.n):
+            for j in range(self.n):
+                if (i, j) not in self.obstacles and (i, j) != self.end:
+                    self.q_table[(i, j)] = {'up': 0, 'down': 0, 'left': 0, 'right': 0}
+                # Ensure the end state is also in the Q-table to avoid KeyError
+                if (i, j) == self.end:
+                    self.q_table[(i, j)] = {'up': 0, 'down': 0, 'left': 0, 'right': 0}
 
-        is_valid = False
+    def choose_action(self, state):
+        """Choose an action using the epsilon-greedy policy."""
+        if random.random() < self.epsilon:  # Explore with probability epsilon
+            return random.choice(['up', 'down', 'left', 'right'])
+        else:  # Exploit best action
+            return max(self.q_table[state], key=self.q_table[state].get)
+
+    def update_q_value(self, state, action, reward, next_state):
+        """Update the Q-value for the given state and action."""
+        if next_state in self.q_table:
+            max_future_q = max(self.q_table[next_state].values())
+            current_q = self.q_table[state][action]
+            new_q = (1 - self.learning_rate) * current_q + self.learning_rate * (
+                        reward + self.discount_factor * max_future_q)
+            self.q_table[state][action] = new_q
+        else:
+            # Handle the case where next_state is not in the q_table (like end state or non-reachable state)
+            self.q_table[state][action] = (1 - self.learning_rate) * self.q_table[state][
+                action] + self.learning_rate * reward
+
+    def train(self, episodes=2000):
+        """Train the agent using the Q-learning algorithm and record paths every 5 episodes."""
+        self.initialize_q_table()
+        path_log = []  # List to hold paths taken every 5 episodes
+
+        for episode in range(episodes):
+            state = self.start
+            next_state = self.end
+
+            current_path = []  # List to store the current path
+
+            while state != self.end and state not in current_path and state != next_state:
+                action = self.choose_action(state)
+                next_state = self.get_next_state(state, action)
+                reward = self.get_reward(next_state)
+                self.update_q_value(state, action, reward, next_state)
+
+                print(state)
+                print(next_state)
+                print('-'*30)
+
+                if episode % N == N-1:  # Add state to the path if we're recording this episode
+                    current_path.append(state)
+
+                state = next_state
+
+            if episode % N == N-1:  # Add the final state to the path and save it to the log
+                if state == self.end:
+                    current_path.append(self.end)
+                path_log.append(current_path)
+
+        return path_log  # Return the path log for analysis
+
+    def get_next_state(self, state, action):
+        """Get the next state from current state and action."""
         row, col = state
+        if action == 'up':
+            return (row - 1, col) if self.is_reachable((row - 1, col)) else state
+        elif action == 'down':
+            return (row + 1, col) if self.is_reachable((row + 1, col)) else state
+        elif action == 'left':
+            return (row, col - 1) if self.is_reachable((row, col - 1)) else state
+        elif action == 'right':
+            return (row, col + 1) if self.is_reachable((row, col + 1)) else state
+        return state
 
-        if action == 'up' and self.is_reachable((row - 1, col)):
-            next_state = (row - 1, col)
-        elif action == 'down' and self.is_reachable((row + 1, col)):
-            next_state = (row + 1, col)
-        elif action == 'left' and self.is_reachable((row, col - 1)):
-            next_state = (row, col - 1)
-        elif action == 'right' and self.is_reachable((row, col + 1)):
-            next_state = (row, col + 1)
-        else:
-            next_state = state  # Remain in the same state if the action is not valid
+    def get_reward(self, state):
+        """Return the reward for reaching the given state."""
+        if state == self.end:
+            return 10  # reward for reaching the end
+        if state in self.obstacles:
+            return -1  # penalty for hitting an obstacle
+        return -0.01  # small penalty for each move
 
-        # Compute the new value function for the state
-        if next_state == self.end:
-            reward = 10  # terminal reward
-        elif next_state in self.obstacles:
-            reward = -1  # obstacle penalty
-        else:
-            reward = gamma * self.value_function.get(next_state, 0) - 0.01  # step penalty
-
-        self.value_function[state] = reward
-
-    def value_iteration(self, gamma=0.9, epsilon=1e-6, max_iterations=10000):
-        """Perform value iteration to converge the value function."""
-        self.initialize_random_policy()
-        delta = float('inf')
-        iterations = 0
-        while delta > epsilon and iterations < max_iterations:
-            iterations += 1
-            delta = 0
-            for state in self.policy:
-                if state != self.end:
-                    action = self.policy[state]
-                    old_value = self.value_function.get(state, 0)
-                    self.bellman_update(state, action, gamma)
-                    new_value = self.value_function[state]
-                    delta = max(delta, abs(old_value - new_value))
-
-        # if iterations == max_iterations:
-        #     print(f"Value Iteration did not converge after {max_iterations} iterations.")
-        # else:
-        #     print("Value Iteration Converged!")
-
-        # optimal_policy = self.get_optimal_policy()
-        # print("\nOptimal Policy:")
-        # for state, action in optimal_policy.items():
-        #     print(f"State {state}: Action = {action}")
-
-    def get_optimal_path(self):
-        """根据最优策略从起点出发找到到达终点的路径，包含防止无限循环的措施。"""
+    def get_optimal_path_from_q_table(self):
         path = []
-        visited = set()  # 追踪已訪問的狀態
-        curr_state = self.start
-        steps = 0
-        max_steps = self.n * self.n  # 設置合理的步數上限
+        state = self.start
+        while state != self.end:
 
-        while curr_state != self.end and steps < max_steps:
-            if curr_state in visited:
-                # print("Detected loop, stopping path search.")
-                return []  # 如果检测到循环，返回空列表
-            visited.add(curr_state)
-            path.append(curr_state)
-            action = self.policy.get(curr_state)
+            action = max(self.q_table[state], key=self.q_table[state].get)  # 選擇當前狀態下最大 Q 值的動作
+            path.append(state)
+            next_state = self.get_next_state(state, action)  # 獲取下一狀態
+            if next_state in path:
+                return []
+            state = next_state
 
-            # 根据行动更新当前状态
-            if action == 'up':
-                next_state = (curr_state[0] - 1, curr_state[1])
-            elif action == 'down':
-                next_state = (curr_state[0] + 1, curr_state[1])
-            elif action == 'left':
-                next_state = (curr_state[0], curr_state[1] - 1)
-            elif action == 'right':
-                next_state = (curr_state[0], curr_state[1] + 1)
-            else:
-                # print("No valid action found, stopping path search.")
-                return []  # 如果没有有效行动，返回空列表
-
-            # 檢查是否出界或走進障礙物
-            if not self.is_reachable(next_state):
-                # print("Next state is not reachable, stopping path search.")
-                return []  # 如果下一状态不可达，返回空列表
-
-            curr_state = next_state
-            steps += 1
-
-        if curr_state == self.end:
-            self.action_log.append({
-                "state": list(curr_state),
-                "action": '',
-                "reward": 0
-            })
-            path.append(self.end)
-            return path
-        else:
-            # print("Failed to reach end within step limit.")
-            return []  # 如果在步数限制内未到达终点，返回空列表
-
-    def find_optimal_path(self, max_iterations=100000, gamma=0.9, epsilon=1e-6):
-        """自动重新初始化策略并继续寻找,直到找到从起点到终点的路径或达到尝试上限"""
-        iteration = 0
-        answer = []
-        for iteration in tqdm(range(max_iterations)):
-            self.initialize_random_policy()
-            self.value_iteration(gamma, epsilon)
-            optimal_path = self.get_optimal_path()
-            if optimal_path:
-
-                if not answer or len(answer) > len(optimal_path):
-                    # print("Optimal Path Found:", optimal_path)
-                    answer = optimal_path
-            else:
-                # print(f"No valid path found in iteration {iteration + 1}")
-                pass
-            iteration += 1
-
-        if not answer:
-            print("Failed to find a path after maximum iterations")
-
-        return answer  # 如果达到最大迭代次数仍未找到路径,返回空列表
-
-    def get_action_log(self):
-        """Retrieve the action log."""
-        return self.action_log
+        path.append(self.end)
+        return path
 
 
 @app.route('/')
@@ -184,14 +147,19 @@ def generate_grid():
 
 @app.route('/evaluate_policy', methods=['POST'])
 def evaluate_policy():
+    global N
     points = request.json['points']
     grid_size = int(request.json['n'])
+
+    if grid_size in [3, 4]:
+        N = 20
+    else:
+        N = 40
 
     grid_world = GridWorld(grid_size)
 
     for point in points:
         row, col, cell_type = point['row'], point['col'], point['type']
-
         if cell_type == 'start':
             grid_world.set_start(row, col)
         elif cell_type == 'end':
@@ -199,30 +167,34 @@ def evaluate_policy():
         elif cell_type == 'obstacle':
             grid_world.set_obstacle(row, col)
 
-    grid_world.value_iteration()
-    optimal_path = grid_world.find_optimal_path()
+    grid_world.initialize_q_table()
+    action_log = grid_world.train(episodes=1000)  # 训练模型使用 Q-learning 算法
+
+    optimal_path = grid_world.get_optimal_path_from_q_table()  # 从 Q 表获取最佳路径
 
     new_optimal_path = ''
-    action_log = []
     for point in optimal_path:
         new_optimal_path += '[' + str(point[0]) + ', ' + str(point[1]) + '] → '
 
     new_optimal_path = new_optimal_path[:-3]
 
+    new_action_log = []
+
     if not new_optimal_path:
         new_optimal_path = 'Optimal Path Not Found'
     else:
-        for points in optimal_path:
-            action_log.append(
-                {'state': points}
-            )
+        if action_log:
+            for action_list in action_log:
+                for actions in action_list:
+                    new_action_log.append({'state': actions})
 
     print('ANS:')
     print(new_optimal_path)
 
     return jsonify({
-        'optimal_path': new_optimal_path,
-        'action_log': action_log
+        'message': new_optimal_path,
+        'optimal_path': optimal_path,
+        'action_log': new_action_log
     })
 
 

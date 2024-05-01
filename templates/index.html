@@ -34,6 +34,10 @@
             background-color: orange; /* 標記當前位置的顏色 */
         }
 
+        .optimal {
+            background-color: cornflowerblue; /* 標記當前位置的顏色 */
+        }
+
         #grid-with-arrows {
             display: grid;
             grid-template-columns: repeat({{ n }}, 50px); /* 根据网格大小调整 */
@@ -172,15 +176,16 @@
             })
             .then(response => response.json())
             .then(data => {
-                alert(data['optimal_path']);
+                alert(data['message']);
 
                 if(data['optimal_path'] !== 'Optimal Path Not Found')
-                    renderActionLog(data['action_log'])
+                    renderActionLog(data['action_log'], data['optimal_path'])
             })
             .catch(error => console.error('Error:', error));
         }
 
-        function renderActionLog(actionLog) {
+        function renderActionLog(actionLog, optimal) {
+            document.getElementById('status').innerHTML = 'TRAINING ...'
             let i = 0;
             function updateGrid() {
                 if (i < actionLog.length) {
@@ -190,15 +195,47 @@
                     const prevSelected = document.querySelector('.current');
                     if (prevSelected) {
                         prevSelected.classList.remove('current');
-                        prevSelected.innerHTML = '';  // 清空前一個格子的內容
                     }
                     cell.classList.add('current');
-                    i = (i+1) % actionLog.length;
+                    i++;
                     setTimeout(updateGrid, 200); // 更新下一個動作的延遲
+                }
+                else{
+
+                    document.getElementById('status').innerHTML = 'TRAINING FINISHED'
+                    const prevSelected = document.querySelector('.current');
+                    if (prevSelected) {
+                        prevSelected.classList.remove('current');
+                        prevSelected.innerHTML = '';  // 清空前一個格子的內容
+                    }
+                    setTimeout(renderOptimal, 5000, optimal)
                 }
             }
             updateGrid(); // 開始更新格子
         }
+
+        function renderOptimal(actionLog) {
+
+            let i = 0;
+            function update() {
+                if (i < actionLog.length) {
+                    const action = actionLog[i];
+                    const cellId = `cell-${action[0]}-${action[1]}`;
+                    const cell = document.getElementById(cellId);
+                    const prevSelected = document.querySelector('.optimal');
+                    if (prevSelected) {
+                        prevSelected.classList.remove('optimal');
+                    }
+                    cell.classList.add('optimal');
+                    i = (i+1) % actionLog.length;
+                    setTimeout(update, 200); // 更新下一個動作的延遲
+                }
+
+            }
+            update(); // 開始更新格子
+        }
+
+
 
         window.onload = function(){
             document.getElementById('text').innerHTML = 'Please click on the grid cells to set the starting point (green)';
@@ -210,6 +247,7 @@
 
     </script>
     <p id="text"></p>
+    <p id="status" style="font-weight: bold"></p>
     <div class="grid-container" id="grid-container">
         {% for row in range(n) %}
             {% for col in range(n) %}
