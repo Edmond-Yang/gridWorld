@@ -67,25 +67,29 @@ class GridWorld:
         self.initialize_q_table()
         path_log = []  # List to hold paths taken every 5 episodes
 
+        iteration = 0
+        max_iteration = 1000
+
         for episode in range(episodes):
             state = self.start
-            next_state = self.end
 
-            current_path = []  # List to store the current path
+            current_path = []
+            iteration = 0
 
-            while state != self.end and state not in current_path and state != next_state:
+            while state != self.end and iteration < max_iteration:
+
+                iteration += 1
+
                 action = self.choose_action(state)
                 next_state = self.get_next_state(state, action)
+
                 reward = self.get_reward(next_state)
                 self.update_q_value(state, action, reward, next_state)
-
                 print(state)
                 print(next_state)
                 print('-'*30)
 
-                if episode % N == N-1:  # Add state to the path if we're recording this episode
-                    current_path.append(state)
-
+                current_path.append(state)
                 state = next_state
 
             if episode % N == N-1:  # Add the final state to the path and save it to the log
@@ -114,6 +118,7 @@ class GridWorld:
             return 10  # reward for reaching the end
         if state in self.obstacles:
             return -1  # penalty for hitting an obstacle
+
         return -0.01  # small penalty for each move
 
     def get_optimal_path_from_q_table(self):
